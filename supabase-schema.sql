@@ -19,6 +19,9 @@ create table if not exists public.tracked_handles (
   id uuid primary key default gen_random_uuid(),
   handle text not null unique,
   last_seen_post_id text,
+  -- ID, die twitterapi.io für die Echtzeit-Beobachtung dieses Profils vergibt (aus
+  -- get_user_to_monitor_tweet) -- nötig, um das Profil später sauber wieder abzumelden.
+  stream_monitor_id text,
   created_at timestamptz not null default now()
 );
 
@@ -50,20 +53,29 @@ create policy "watchlist_delete_own"
 -- damit gleichzeitig der globale tracked_handles-Eintrag entsteht.
 
 -- Fügt ein Profil zur eigenen Watchlist hinzu und legt es bei Bedarf global zum Pollen an.
+-- Gibt true zurück, wenn der Handle GLOBAL neu war (also gerade erst in tracked_handles
+-- angelegt wurde) -- die watchlist-Edge-Function nutzt das, um zu wissen, ob sie das Profil
+-- zusätzlich bei twitterapi.io für die Echtzeit-Beobachtung anmelden muss.
 -- SECURITY DEFINER: läuft mit den Rechten der Funktion (Tabellenbesitzer), umgeht damit
 -- gezielt die fehlende Insert-Policy auf tracked_handles -- das ist hier gewollt, nicht
 -- eine Lücke, denn nur diese Funktion darf tracked_handles befüllen.
 create or replace function public.add_to_watchlist(p_handle text)
-returns void
+returns boolean
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_inserted int;
 begin
   insert into public.tracked_handles (handle) values (p_handle)
   on conflict (handle) do nothing;
 
+  get diagnostics v_inserted = row_count;
+
   insert into public.watchlist (user_id, handle) values (auth.uid(), p_handle);
+
+  return v_inserted > 0;
 end;
 $$;
 
