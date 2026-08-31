@@ -163,7 +163,8 @@ input{font:inherit;color:inherit;}
 .user-chip{display:flex; align-items:center; gap:8px;}
 .user-avatar{width:26px; height:26px; border-radius:50%; border:1px solid var(--border); display:block; object-fit:cover; background:var(--surface-2);}
 .user-name{font-size:12px; font-weight:700; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-.member-count{font-size:11px; color:var(--text-dim); letter-spacing:0.02em; white-space:nowrap;}
+.member-count{font-size:11px; color:var(--text-dim); letter-spacing:0.02em; white-space:nowrap; background:none; border:none; cursor:pointer; padding:0; text-decoration:underline; text-decoration-style:dotted;}
+.member-count:hover{color:var(--accent);}
 
 .gate-wrap{
   max-width:460px; margin:60px auto 0; text-align:center; background:var(--surface);
@@ -192,6 +193,18 @@ input{font:inherit;color:inherit;}
 .toast-handle{font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace; font-weight:800; font-size:13px; color:var(--accent);}
 .toast-text{font-size:13px; color:var(--text); overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;}
 @keyframes toast-in{from{opacity:0; transform:translateX(24px);} to{opacity:1; transform:translateX(0);}}
+
+.modal-overlay{
+  display:none; position:fixed; inset:0; z-index:60; background:rgba(0,0,0,0.5);
+  align-items:flex-start; justify-content:center; padding:60px 20px;
+}
+.modal-overlay.open{display:flex;}
+.modal-card{background:var(--surface); border:1px solid var(--border); max-width:420px; width:100%; padding:24px; max-height:70vh; overflow-y:auto;}
+.modal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:12px;}
+.modal-title{font-size:18px; font-weight:800;}
+.member-row{display:flex; align-items:center; gap:10px; padding:8px 2px; border-bottom:1px solid var(--border);}
+.member-row:last-child{border-bottom:none;}
+.member-name{font-size:13px; font-weight:600;}
 
 @media (prefers-reduced-motion: reduce){
   *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important;}
@@ -222,6 +235,12 @@ input{font:inherit;color:inherit;}
 
 <div class="app" id="app"></div>
 <div class="toast-container" id="toastContainer"></div>
+<div class="modal-overlay" id="membersModal">
+  <div class="modal-card">
+    <div class="modal-head"><h2 class="modal-title">Mitglieder</h2><button class="btn-ghost" id="closeMembersBtn">Schließen</button></div>
+    <div id="membersList"></div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
@@ -250,6 +269,68 @@ function loadMemberCount(){
   });
 }
 
+// Trägt den eigenen Discord-Namen/-Avatar in die Mitgliederliste ein -- läuft bei jedem
+// Login, damit ein geänderter Discord-Name/-Avatar dort auch aktuell bleibt.
+function upsertMember(){
+  if(!sb || !auth.user) return;
+  sb.from("members").upsert({
+    user_id: auth.user.id,
+    discord_username: currentDisplayName(),
+    avatar_url: currentAvatarUrl()
+  }).then(function(res){
+    if(res.error) console.error("Cage Tracker: Mitgliedseintrag konnte nicht gespeichert werden.", res.error);
+  });
+}
+
+var membersData = null;
+
+function openMembersModal(){
+  document.getElementById("membersModal").classList.add("open");
+  loadMembers();
+}
+
+function closeMembersModal(){
+  document.getElementById("membersModal").classList.remove("open");
+}
+
+function loadMembers(){
+  var list = document.getElementById("membersList");
+  if(membersData !== null){ renderMembersList(); return; }
+  list.innerHTML = '<div class="loading-wrap">Lädt…</div>';
+  sb.from("members").select("discord_username, avatar_url")
+    .order("joined_at", { ascending:true })
+    .then(function(res){
+      if(res.error){
+        console.error("Cage Tracker: Mitgliederliste konnte nicht geladen werden.", res.error);
+        membersData = [];
+      } else {
+        membersData = res.data || [];
+      }
+      renderMembersList();
+    });
+}
+
+function renderMembersList(){
+  var list = document.getElementById("membersList");
+  if(!membersData || membersData.length === 0){
+    list.innerHTML = '<div class="wl-empty">Noch keine Mitglieder.</div>';
+    return;
+  }
+  var html = "";
+  membersData.forEach(function(m){
+    html += '<div class="member-row">';
+    html += m.avatar_url ? '<img class="avatar-sm" src="'+escapeHtml(m.avatar_url)+'" alt="">' : '<span class="avatar-sm"></span>';
+    html += '<span class="member-name">'+escapeHtml(m.discord_username || "CAGE-Mitglied")+'</span>';
+    html += '</div>';
+  });
+  list.innerHTML = html;
+}
+
+document.getElementById("closeMembersBtn").addEventListener("click", closeMembersModal);
+document.getElementById("membersModal").addEventListener("click", function(e){
+  if(e.target.id === "membersModal") closeMembersModal();
+});
+
 function currentDisplayName(){
   if(!auth.user) return "";
   var meta = auth.user.user_metadata || {};
@@ -258,7 +339,7 @@ function currentDisplayName(){
 function currentAvatarUrl(){
   if(!auth.user) return null;
   var meta = auth.user.user_metadata || {};
-  return meta.avatar_url || null;
+  return meta.avatar_url || meta.picture || null;
 }
 
 function loginWithDiscord(){
@@ -278,6 +359,8 @@ function teardownSession(){
   feedData = null;
   pushState = "unknown";
   memberCount = null;
+  membersData = null;
+  closeMembersModal();
   if(feedChannel){ sb.removeChannel(feedChannel); feedChannel = null; }
 }
 
@@ -595,7 +678,7 @@ function renderTopbar(){
   }
   var avatar = currentAvatarUrl();
   var html = "";
-  if(memberCount !== null) html += '<span class="member-count">'+memberCount+' Mitglieder</span>';
+  if(memberCount !== null) html += '<button class="member-count" id="memberCountBtn">'+memberCount+' Mitglieder</button>';
   html += '<div class="user-chip">';
   html += avatar ? '<img class="user-avatar" src="'+escapeHtml(avatar)+'" alt="">' : '';
   html += '<span class="user-name">'+escapeHtml(currentDisplayName())+'</span>';
@@ -604,6 +687,8 @@ function renderTopbar(){
   else if(pushState === "off") html += '<button class="reset-btn" id="pushBtn">🔕 Push aktivieren</button>';
   html += '<button class="reset-btn" id="logoutBtn">Abmelden</button>';
   area.innerHTML = html;
+  var memberCountBtn = document.getElementById("memberCountBtn");
+  if(memberCountBtn) memberCountBtn.addEventListener("click", openMembersModal);
   var pushBtn = document.getElementById("pushBtn");
   if(pushBtn) pushBtn.addEventListener("click", togglePush);
   document.getElementById("logoutBtn").addEventListener("click", logout);
@@ -729,8 +814,10 @@ function boot(){
   sb.auth.onAuthStateChange(function(event, session){
     if(session && session.user){
       auth.user = session.user;
+      console.log("Cage Tracker Debug -- Discord user_metadata:", auth.user.user_metadata);
       subscribeFeed();
       checkPushState();
+      upsertMember();
       loadMemberCount();
       setView("feed");
     } else if(event === "SIGNED_OUT" || event === "INITIAL_SESSION"){
