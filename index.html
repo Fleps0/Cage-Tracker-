@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cage Tracker — X-Profil-Watchlist</title>
+<style>
+:root{
+  --bg:#f5f2ea;
+  --surface:#ffffff;
+  --surface-2:#efe9db;
+  --border:#ddd6c4;
+  --text:#201d16;
+  --text-dim:#6b6558;
+  --accent:#b8720a;
+  --accent-soft:rgba(184,114,10,0.12);
+  --accent-ink:#ffffff;
+  --good:#1f9d6a;
+  --good-soft:rgba(31,157,106,0.12);
+  --bad:#c8323a;
+  --bad-soft:rgba(200,50,58,0.12);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0c0c10;
+    --surface:#17161c;
+    --surface-2:#201f27;
+    --border:#2c2b34;
+    --text:#f2efe8;
+    --text-dim:#9c98a8;
+    --accent:#ffb020;
+    --accent-soft:rgba(255,176,32,0.14);
+    --accent-ink:#171106;
+    --good:#34d399;
+    --good-soft:rgba(52,211,153,0.14);
+    --bad:#f2545b;
+    --bad-soft:rgba(242,84,91,0.14);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0c0c10; --surface:#17161c; --surface-2:#201f27; --border:#2c2b34;
+  --text:#f2efe8; --text-dim:#9c98a8; --accent:#ffb020; --accent-soft:rgba(255,176,32,0.14);
+  --accent-ink:#171106; --good:#34d399; --good-soft:rgba(52,211,153,0.14);
+  --bad:#f2545b; --bad-soft:rgba(242,84,91,0.14);
+}
+:root[data-theme="light"]{
+  --bg:#f5f2ea; --surface:#ffffff; --surface-2:#efe9db; --border:#ddd6c4;
+  --text:#201d16; --text-dim:#6b6558; --accent:#b8720a; --accent-soft:rgba(184,114,10,0.12);
+  --accent-ink:#ffffff; --good:#1f9d6a; --good-soft:rgba(31,157,106,0.12);
+  --bad:#c8323a; --bad-soft:rgba(200,50,58,0.12);
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Consolas,"Liberation Mono",Menlo,monospace;}
+h1,h2,h3{font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;text-wrap:balance;margin:0;}
+button{font:inherit;color:inherit;}
+input{font:inherit;color:inherit;}
+::selection{background:var(--accent-soft);}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+.topbar{
+  position:sticky; top:0; z-index:10;
+  background:var(--bg);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(6px);
+}
+.topbar-inner{
+  max-width:820px; margin:0 auto; padding:16px 20px;
+  display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+}
+.wordmark{
+  display:flex; align-items:baseline; gap:2px; cursor:pointer; background:none; border:none; padding:0;
+}
+.wordmark-text{
+  font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;
+  font-weight:800; font-size:22px; letter-spacing:0.1em; color:var(--text);
+}
+.wordmark-cursor{color:var(--accent); animation:blink 1.1s steps(1) infinite;}
+@keyframes blink{50%{opacity:0;}}
+.wordmark-sub{font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-dim); margin-left:8px;}
+
+.tabs{display:flex; gap:4px;}
+.tab-btn{
+  background:none; border:1px solid transparent; padding:8px 14px; cursor:pointer;
+  font-size:13px; font-weight:600; letter-spacing:0.02em; color:var(--text-dim); border-radius:2px;
+}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--text); border-color:var(--border); background:var(--surface);}
+
+.stats-readout{display:flex; align-items:center; gap:14px;}
+
+.reset-btn{
+  background:none; border:1px solid var(--border); color:var(--text-dim); font-size:11px;
+  padding:7px 10px; cursor:pointer; border-radius:2px; letter-spacing:0.02em;
+}
+.reset-btn:hover{color:var(--bad); border-color:var(--bad);}
+
+.app{max-width:820px; margin:0 auto; padding:28px 20px 100px;}
+
+.hero-line{display:flex; align-items:center; gap:10px; margin-bottom:4px;}
+.eyebrow{font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--accent);}
+.hero-title{font-size:26px; font-weight:800; letter-spacing:-0.01em; margin:6px 0 6px;}
+.hero-sub{color:var(--text-dim); font-size:14px; max-width:60ch; margin-bottom:28px;}
+
+.btn{
+  background:var(--accent); color:var(--accent-ink); border:none; padding:10px 18px;
+  font-weight:700; font-size:13px; letter-spacing:0.02em; cursor:pointer; border-radius:2px;
+  transition:filter .15s ease, transform .1s ease;
+}
+.btn:hover{filter:brightness(1.08);}
+.btn:active{transform:scale(0.98);}
+.btn:disabled{opacity:0.4; cursor:not-allowed; filter:none;}
+.btn-ghost{
+  background:none; color:var(--text); border:1px solid var(--border); padding:8px 14px;
+  font-weight:700; font-size:12px; cursor:pointer; border-radius:2px;
+}
+.btn-ghost:hover{border-color:var(--accent); color:var(--accent);}
+
+.panel{background:var(--surface); border:1px solid var(--border); padding:22px;}
+
+.wl-form{display:flex; gap:10px; margin-bottom:22px; flex-wrap:wrap;}
+.wl-input{
+  flex:1; min-width:220px; background:var(--surface-2); border:1px solid var(--border); color:var(--text);
+  padding:11px 14px; font-size:14px; border-radius:2px;
+}
+.wl-input:focus-visible{border-color:var(--accent);}
+.wl-error{color:var(--bad); font-size:12px; margin:-14px 0 18px;}
+
+.wl-list{display:flex; flex-direction:column;}
+.wl-row{display:flex; align-items:center; gap:12px; padding:14px 4px; border-bottom:1px solid var(--border); flex-wrap:wrap;}
+.wl-row:last-child{border-bottom:none;}
+.wl-handle{font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace; font-weight:800; font-size:14px;}
+.wl-meta{font-size:12px; color:var(--text-dim); flex:1;}
+.wl-empty, .feed-empty{color:var(--text-dim); font-size:14px; padding:30px 4px; text-align:center;}
+
+.feed-list{display:flex; flex-direction:column; gap:14px;}
+.feed-item{background:var(--surface); border:1px solid var(--border); padding:18px 20px;}
+.feed-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:8px; flex-wrap:wrap;}
+.feed-handle{font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace; font-weight:800; font-size:14px; color:var(--accent);}
+.feed-time{font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.06em;}
+.feed-text{font-size:14px; color:var(--text); margin-bottom:14px; white-space:pre-wrap;}
+.feed-link{display:inline-block; font-size:12px; font-weight:700; color:var(--accent-ink); background:var(--accent); padding:8px 14px; border-radius:2px; text-decoration:none;}
+.feed-link:hover{filter:brightness(1.08);}
+
+.footnote{margin-top:36px; font-size:12px; color:var(--text-dim); border-top:1px solid var(--border); padding-top:16px;}
+
+.user-chip{display:flex; align-items:center; gap:8px;}
+.user-avatar{width:26px; height:26px; border-radius:50%; border:1px solid var(--border); display:block; object-fit:cover; background:var(--surface-2);}
+.user-name{font-size:12px; font-weight:700; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
+.gate-wrap{
+  max-width:460px; margin:60px auto 0; text-align:center; background:var(--surface);
+  border:1px solid var(--border); padding:40px 32px;
+}
+.gate-eyebrow{font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--accent); margin-bottom:10px;}
+.gate-title{font-size:24px; font-weight:800; letter-spacing:-0.01em; margin-bottom:12px;}
+.gate-sub{font-size:14px; color:var(--text-dim); margin-bottom:26px;}
+.discord-btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  background:var(--accent); color:var(--accent-ink); border:none; padding:13px 26px;
+  font-weight:700; font-size:14px; letter-spacing:0.02em; cursor:pointer; border-radius:2px; width:100%;
+}
+.discord-btn:hover{filter:brightness(1.08);}
+.gate-config-error{max-width:460px; margin:60px auto 0; background:var(--bad-soft); border:1px solid var(--bad); padding:20px 24px; font-size:13px; color:var(--text);}
+
+.loading-wrap{max-width:460px; margin:100px auto 0; text-align:center; color:var(--text-dim); font-size:13px; font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace; letter-spacing:0.04em;}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important;}
+}
+
+@media (max-width:520px){
+  .hero-title{font-size:22px;}
+  .panel{padding:18px;}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <button class="wordmark" id="logoBtn" aria-label="Zur Übersicht">
+      <span class="wordmark-text">CAGE<span class="wordmark-cursor">_</span></span>
+      <span class="wordmark-sub">Tracker</span>
+    </button>
+    <div class="tabs" id="tabs">
+      <button class="tab-btn" data-view="feed">Feed</button>
+      <button class="tab-btn" data-view="watchlist">Watchlist</button>
+    </div>
+    <div class="stats-readout" id="statsArea"></div>
+  </div>
+</div>
+
+<div class="app" id="app"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+(function(){
+"use strict";
+
+var configOk = (typeof SUPABASE_URL === "string" && SUPABASE_URL.indexOf("https://") === 0 &&
+                typeof SUPABASE_ANON_KEY === "string" && SUPABASE_ANON_KEY.length > 10 &&
+                typeof supabase !== "undefined");
+var sb = configOk ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+var auth = { user:null };
+var watchlistData = null;
+var feedData = null;
+var feedChannel = null;
+var pushState = "unknown"; // "unknown" | "unsupported" | "off" | "on"
+
+function currentDisplayName(){
+  if(!auth.user) return "";
+  var meta = auth.user.user_metadata || {};
+  return meta.full_name || meta.name || (meta.custom_claims && meta.custom_claims.global_name) || auth.user.email || "CAGE-Mitglied";
+}
+function currentAvatarUrl(){
+  if(!auth.user) return null;
+  var meta = auth.user.user_metadata || {};
+  return meta.avatar_url || null;
+}
+
+function loginWithDiscord(){
+  if(!sb) return;
+  sb.auth.signInWithOAuth({ provider:"discord", options:{ redirectTo: window.location.href } });
+}
+function logout(){
+  if(!sb) return;
+  sb.auth.signOut().then(function(){
+    teardownSession();
+    setView("gate");
+  });
+}
+function teardownSession(){
+  auth.user = null;
+  watchlistData = null;
+  feedData = null;
+  pushState = "unknown";
+  if(feedChannel){ sb.removeChannel(feedChannel); feedChannel = null; }
+}
+
+// --- Browser-Push ---
+
+function urlBase64ToUint8Array(base64String){
+  var padding = "=".repeat((4 - base64String.length % 4) % 4);
+  var base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  var rawData = window.atob(base64);
+  var outputArray = new Uint8Array(rawData.length);
+  for(var i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+function hasVapidKey(){
+  return typeof VAPID_PUBLIC_KEY === "string" && VAPID_PUBLIC_KEY.length > 10 && VAPID_PUBLIC_KEY.indexOf("DEIN-") !== 0;
+}
+
+function checkPushState(){
+  if(!("serviceWorker" in navigator) || !("PushManager" in window) || !hasVapidKey()){
+    pushState = "unsupported";
+    renderTopbar();
+    return;
+  }
+  navigator.serviceWorker.register("sw.js").then(function(reg){
+    return reg.pushManager.getSubscription();
+  }).then(function(sub){
+    pushState = sub ? "on" : "off";
+    renderTopbar();
+  }).catch(function(err){
+    console.error("Cage Tracker: Service Worker konnte nicht registriert werden.", err);
+    pushState = "unsupported";
+    renderTopbar();
+  });
+}
+
+function subscribePush(){
+  navigator.serviceWorker.ready.then(function(reg){
+    return reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+  }).then(function(sub){
+    var json = sub.toJSON();
+    return sb.from("push_subscriptions").insert({
+      user_id: auth.user.id,
+      endpoint: json.endpoint,
+      p256dh: json.keys.p256dh,
+      auth_key: json.keys.auth
+    });
+  }).then(function(res){
+    if(res && res.error && res.error.code !== "23505"){
+      console.error("Cage Tracker: Push-Abo konnte nicht gespeichert werden.", res.error);
+    }
+    pushState = "on";
+    renderTopbar();
+  }).catch(function(err){
+    console.error("Cage Tracker: Push-Anmeldung fehlgeschlagen.", err);
+    alert("Push konnte nicht aktiviert werden — hast du die Benachrichtigungs-Erlaubnis im Browser erteilt?");
+  });
+}
+
+function unsubscribePush(){
+  navigator.serviceWorker.ready.then(function(reg){
+    return reg.pushManager.getSubscription();
+  }).then(function(sub){
+    if(!sub) return;
+    var endpoint = sub.endpoint;
+    return sub.unsubscribe().then(function(){
+      return sb.from("push_subscriptions").delete().eq("endpoint", endpoint);
+    });
+  }).then(function(){
+    pushState = "off";
+    renderTopbar();
+  }).catch(function(err){
+    console.error("Cage Tracker: Push-Abmeldung fehlgeschlagen.", err);
+  });
+}
+
+function togglePush(){
+  if(pushState === "on") unsubscribePush();
+  else if(pushState === "off") subscribePush();
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+  });
+}
+
+function normalizeHandle(raw){
+  var s = (raw || "").trim();
+  s = s.replace(/^https?:\/\/(www\.)?(x\.com|twitter\.com)\//i, "");
+  s = s.replace(/^@/, "");
+  s = s.split(/[/?]/)[0];
+  return s.toLowerCase();
+}
+
+function timeAgo(iso){
+  if(!iso) return "";
+  var diffMs = Date.now() - new Date(iso).getTime();
+  var min = Math.floor(diffMs / 60000);
+  if(min < 1) return "gerade eben";
+  if(min < 60) return "vor " + min + " Min.";
+  var std = Math.floor(min / 60);
+  if(std < 24) return "vor " + std + " Std.";
+  var tage = Math.floor(std / 24);
+  return "vor " + tage + " Tag" + (tage === 1 ? "" : "en");
+}
+
+// --- Watchlist ---
+
+function loadWatchlist(){
+  if(!sb || !auth.user) return;
+  sb.from("watchlist").select("id, handle, added_by, added_by_name, created_at")
+    .order("created_at", { ascending:false })
+    .then(function(res){
+      if(res.error){
+        console.error("Cage Tracker: Watchlist konnte nicht geladen werden.", res.error);
+        watchlistData = [];
+      } else {
+        watchlistData = res.data || [];
+      }
+      if(state.view === "watchlist") render();
+    });
+}
+
+function addProfile(){
+  var input = document.getElementById("handleInput");
+  var handle = normalizeHandle(input.value);
+  var errBox = document.getElementById("wlError");
+  if(!/^[a-z0-9_]{1,15}$/.test(handle)){
+    if(errBox) errBox.textContent = "Das sieht nicht nach einem gültigen X-Handle aus (nur Buchstaben, Zahlen, Unterstrich, max. 15 Zeichen).";
+    return;
+  }
+  if(errBox) errBox.textContent = "";
+  sb.from("watchlist").insert({
+    handle: handle,
+    added_by: auth.user.id,
+    added_by_name: currentDisplayName()
+  }).then(function(res){
+    if(res.error){
+      if(errBox) errBox.textContent = res.error.code === "23505"
+        ? "@" + handle + " ist schon auf der Watchlist."
+        : "Konnte nicht gespeichert werden.";
+      console.error("Cage Tracker: Profil konnte nicht hinzugefügt werden.", res.error);
+    } else {
+      input.value = "";
+      loadWatchlist();
+    }
+  });
+}
+
+function removeProfile(id){
+  if(!sb) return;
+  sb.from("watchlist").delete().eq("id", id).then(function(res){
+    if(res.error) console.error("Cage Tracker: Profil konnte nicht entfernt werden.", res.error);
+    else loadWatchlist();
+  });
+}
+
+// --- Feed ---
+
+function loadFeed(){
+  if(!sb || !auth.user) return;
+  sb.from("posts").select("*")
+    .order("detected_at", { ascending:false })
+    .limit(50)
+    .then(function(res){
+      if(res.error){
+        console.error("Cage Tracker: Feed konnte nicht geladen werden.", res.error);
+        feedData = [];
+      } else {
+        feedData = res.data || [];
+      }
+      if(state.view === "feed") render();
+    });
+}
+
+function subscribeFeed(){
+  if(!sb || feedChannel) return;
+  feedChannel = sb.channel("cage-tracker-posts")
+    .on("postgres_changes", { event:"INSERT", schema:"public", table:"posts" }, function(payload){
+      feedData = feedData || [];
+      feedData.unshift(payload.new);
+      if(feedData.length > 50) feedData.length = 50;
+      if(state.view === "feed") render();
+    })
+    .subscribe();
+}
+
+// --- Ansicht ---
+
+var state = { view:"loading" };
+
+function setView(v){
+  if(v !== "gate" && v !== "loading" && !auth.user) v = "gate";
+  state.view = v;
+  render();
+  window.scrollTo(0,0);
+}
+
+function render(){
+  renderTopbar();
+  if(state.view === "loading") renderLoading();
+  else if(state.view === "gate") renderGate();
+  else if(state.view === "feed") renderFeed();
+  else if(state.view === "watchlist") renderWatchlist();
+}
+
+function renderTopbar(){
+  document.querySelectorAll(".tab-btn").forEach(function(btn){
+    btn.classList.toggle("active", btn.dataset.view === state.view);
+  });
+  var area = document.getElementById("statsArea");
+  if(!auth.user){
+    area.innerHTML = "";
+    return;
+  }
+  var avatar = currentAvatarUrl();
+  var html = '<div class="user-chip">';
+  html += avatar ? '<img class="user-avatar" src="'+escapeHtml(avatar)+'" alt="">' : '';
+  html += '<span class="user-name">'+escapeHtml(currentDisplayName())+'</span>';
+  html += '</div>';
+  if(pushState === "on") html += '<button class="reset-btn" id="pushBtn">🔔 Push an</button>';
+  else if(pushState === "off") html += '<button class="reset-btn" id="pushBtn">🔕 Push aktivieren</button>';
+  html += '<button class="reset-btn" id="logoutBtn">Abmelden</button>';
+  area.innerHTML = html;
+  var pushBtn = document.getElementById("pushBtn");
+  if(pushBtn) pushBtn.addEventListener("click", togglePush);
+  document.getElementById("logoutBtn").addEventListener("click", logout);
+}
+
+function renderLoading(){
+  document.getElementById("app").innerHTML = '<div class="loading-wrap">Lädt…</div>';
+}
+
+function renderGate(){
+  var app = document.getElementById("app");
+  if(!sb){
+    app.innerHTML = '<div class="gate-config-error">Die Seite ist noch nicht fertig eingerichtet: <code>config.js</code> fehlt oder enthält keine gültigen Supabase-Werte. Siehe <code>SETUP.md</code>.</div>';
+    return;
+  }
+  var html = '<div class="gate-wrap">';
+  html += '<div class="gate-eyebrow">Cage Tracker</div>';
+  html += '<div class="gate-title">Erst anmelden, dann tracken.</div>';
+  html += '<div class="gate-sub">Watchlist und Alarme sind für den ganzen CAGE-Discord gemeinsam — melde dich mit Discord an, um mitzumachen.</div>';
+  html += '<button class="discord-btn" id="loginBtn">Mit Discord anmelden</button>';
+  html += '</div>';
+  app.innerHTML = html;
+  document.getElementById("loginBtn").addEventListener("click", loginWithDiscord);
+}
+
+function renderFeed(){
+  if(feedData === null){
+    document.getElementById("app").innerHTML = '<div class="loading-wrap">Lädt Feed…</div>';
+    loadFeed();
+    return;
+  }
+  var html = "";
+  html += '<div class="hero-line"><span class="eyebrow">Live-Feed</span></div>';
+  html += '<h1 class="hero-title">Frisch erkannte Posts.</h1>';
+  html += '<p class="hero-sub">Neueste zuerst. Mit aktiviertem Push (oben rechts 🔕) bekommst du zusätzlich eine Browser-Benachrichtigung, sobald etwas Neues reinkommt — hier siehst du den Verlauf, auch wenn du den Moment verpasst hast.</p>';
+  if(feedData.length === 0){
+    html += '<div class="feed-empty">Noch nichts erkannt. Sobald ein Profil auf der Watchlist postet, taucht es hier auf.</div>';
+  } else {
+    html += '<div class="feed-list">';
+    feedData.forEach(function(post){
+      html += '<div class="feed-item">';
+      html += '<div class="feed-head"><span class="feed-handle">@'+escapeHtml(post.handle)+'</span><span class="feed-time">'+timeAgo(post.detected_at)+'</span></div>';
+      if(post.text_preview) html += '<div class="feed-text">'+escapeHtml(post.text_preview)+'</div>';
+      html += '<a class="feed-link" href="'+escapeHtml(post.post_url)+'" target="_blank" rel="noopener">Zum Post →</a>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+  document.getElementById("app").innerHTML = html;
+}
+
+function renderWatchlist(){
+  if(watchlistData === null){
+    document.getElementById("app").innerHTML = '<div class="loading-wrap">Lädt Watchlist…</div>';
+    loadWatchlist();
+    return;
+  }
+  var html = "";
+  html += '<div class="hero-line"><span class="eyebrow">Watchlist</span></div>';
+  html += '<h1 class="hero-title">Wen wir beobachten.</h1>';
+  html += '<p class="hero-sub">Gemeinsame Liste für den ganzen Discord. Jeder kann Profile hinzufügen — entfernen darfst du nur, was du selbst eingetragen hast.</p>';
+  html += '<div class="panel">';
+  html += '<div class="wl-form"><input class="wl-input" id="handleInput" type="text" placeholder="X-Handle oder Profil-Link, z. B. @elonmusk"><button class="btn" id="addBtn">Hinzufügen</button></div>';
+  html += '<div class="wl-error" id="wlError"></div>';
+  if(watchlistData.length === 0){
+    html += '<div class="wl-empty">Noch keine Profile auf der Watchlist.</div>';
+  } else {
+    html += '<div class="wl-list">';
+    watchlistData.forEach(function(row){
+      var canRemove = auth.user && row.added_by === auth.user.id;
+      html += '<div class="wl-row">';
+      html += '<span class="wl-handle">@'+escapeHtml(row.handle)+'</span>';
+      html += '<span class="wl-meta">hinzugefügt von '+escapeHtml(row.added_by_name || "CAGE-Mitglied")+'</span>';
+      if(canRemove) html += '<button class="btn-ghost" data-remove="'+row.id+'">Entfernen</button>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  document.getElementById("app").innerHTML = html;
+
+  document.getElementById("addBtn").addEventListener("click", addProfile);
+  document.getElementById("handleInput").addEventListener("keydown", function(e){
+    if(e.key === "Enter") addProfile();
+  });
+  document.querySelectorAll("[data-remove]").forEach(function(btn){
+    btn.addEventListener("click", function(){ removeProfile(btn.dataset.remove); });
+  });
+}
+
+document.getElementById("logoBtn").addEventListener("click", function(){ setView(auth.user ? "feed" : "gate"); });
+document.querySelectorAll(".tab-btn").forEach(function(btn){
+  btn.addEventListener("click", function(){ setView(btn.dataset.view); });
+});
+
+function boot(){
+  if(!sb){
+    state.view = "gate";
+    render();
+    return;
+  }
+  sb.auth.onAuthStateChange(function(event, session){
+    if(session && session.user){
+      auth.user = session.user;
+      subscribeFeed();
+      checkPushState();
+      setView("feed");
+    } else if(event === "SIGNED_OUT" || event === "INITIAL_SESSION"){
+      teardownSession();
+      setView("gate");
+    }
+  });
+}
+
+render();
+boot();
+})();
+</script>
+</body>
+</html>
