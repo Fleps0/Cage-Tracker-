@@ -1,11 +1,13 @@
 // Cage Tracker: die eigentliche Alarm-Funktion.
 //
 // Läuft NICHT im Browser, sondern als Supabase Edge Function -- angestoßen von einem
-// Cron-Job in Supabase selbst (siehe SETUP.md). Geht bei jedem Aufruf die gemeinsame
-// Watchlist durch, prüft pro Profil über eine Dritt-API auf neue X-Posts, trägt Funde
-// in die Datenbank ein und schickt eine Browser-Push-Benachrichtigung an jeden, der
-// sich auf der Seite dafür angemeldet hat -- kein Discord-Umweg, alles läuft über die
-// Seite selbst.
+// Cron-Job in Supabase selbst (siehe SETUP.md). Geht bei jedem Aufruf die Liste der
+// global gepollten Handles durch (tracked_handles -- ein Eintrag pro Profil, egal wie
+// viele Nutzer es auf ihrer PERSÖNLICHEN Watchlist haben, damit dasselbe Profil nicht
+// mehrfach kostenpflichtig abgefragt wird), prüft über eine Dritt-API auf neue X-Posts,
+// trägt Funde in den gemeinsamen Feed ein und schickt eine Browser-Push-Benachrichtigung
+// an jeden, der sich auf der Seite dafür angemeldet hat -- kein Discord-Umweg, alles
+// läuft über die Seite selbst.
 //
 // Datenquelle für X-Posts: twitterapi.io (unofficial, pay-as-you-go -- siehe README.md
 // für die Kosten-Abwägung). Der Aufruf steckt bewusst nur in fetchLatestPosts(), damit
@@ -40,7 +42,7 @@ interface RawTweet {
   createdAt?: string;
 }
 
-interface WatchlistRow {
+interface TrackedHandleRow {
   id: string;
   handle: string;
   last_seen_post_id: string | null;
@@ -116,20 +118,20 @@ async function notifySubscribers(
 Deno.serve(async () => {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-  const [watchlistRes, subsRes] = await Promise.all([
-    supabase.from("watchlist").select("id, handle, last_seen_post_id"),
+  const [handlesRes, subsRes] = await Promise.all([
+    supabase.from("tracked_handles").select("id, handle, last_seen_post_id"),
     supabase.from("push_subscriptions").select("id, endpoint, p256dh, auth_key"),
   ]);
 
-  if (watchlistRes.error) {
-    console.error("Watchlist konnte nicht geladen werden:", watchlistRes.error);
-    return new Response(JSON.stringify({ error: watchlistRes.error.message }), { status: 500 });
+  if (handlesRes.error) {
+    console.error("tracked_handles konnte nicht geladen werden:", handlesRes.error);
+    return new Response(JSON.stringify({ error: handlesRes.error.message }), { status: 500 });
   }
   if (subsRes.error) {
     console.error("Push-Abos konnten nicht geladen werden:", subsRes.error);
   }
 
-  const rows = (watchlistRes.data ?? []) as WatchlistRow[];
+  const rows = (handlesRes.data ?? []) as TrackedHandleRow[];
   const subscribers = (subsRes.data ?? []) as PushSubRow[];
   let totalNewPosts = 0;
 
@@ -145,7 +147,7 @@ Deno.serve(async () => {
 
       if (row.last_seen_post_id === null) {
         // Erster Lauf für dieses Profil: nur die Basis merken, keine Alt-Posts nachmelden.
-        await supabase.from("watchlist").update({ last_seen_post_id: newestId }).eq("id", row.id);
+        await supabase.from("tracked_handles").update({ last_seen_post_id: newestId }).eq("id", row.id);
         continue;
       }
 
@@ -154,7 +156,7 @@ Deno.serve(async () => {
 
       for (const tweet of freshTweets) {
         const { error: insertError } = await supabase.from("posts").insert({
-          watchlist_id: row.id,
+          tracked_handle_id: row.id,
           handle: row.handle,
           post_id: tweet.id,
           post_url: postUrl(row.handle, tweet),
@@ -170,7 +172,7 @@ Deno.serve(async () => {
         totalNewPosts++;
       }
 
-      await supabase.from("watchlist").update({ last_seen_post_id: newestId }).eq("id", row.id);
+      await supabase.from("tracked_handles").update({ last_seen_post_id: newestId }).eq("id", row.id);
     } catch (err) {
       // Ein Profil mit Problemen darf den Lauf für alle anderen nicht abbrechen.
       console.error(`Fehler bei @${row.handle}:`, err);

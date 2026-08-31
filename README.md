@@ -4,8 +4,9 @@ Eine eigenständige Seite für den CAGE-Discord: die Community trägt wichtige X
 
 ## Was drinsteckt
 
-- **Gemeinsame Watchlist**: eine Liste für den ganzen Discord, nicht pro Nutzer. Jeder eingeloggte Nutzer kann Profile hinzufügen; entfernen darf jeder nur, was er selbst eingetragen hat.
-- **Echter Browser-Push-Alarm**: postet ein beobachtetes Profil etwas Neues, bekommst du eine echte Benachrichtigung auf dem Gerät, auf dem du "Push aktivieren" angetippt hast — wie bei einer App, auch wenn die Seite gerade nicht offen ist.
+- **Persönliche Watchlist**: jeder Nutzer hat seine eigene, private Liste — niemand sonst sieht, wen du beobachtest. Im Hintergrund wird dasselbe Profil trotzdem nur einmal abgefragt, auch wenn mehrere Leute es getrackt haben (spart Kosten bei der X-Datenquelle).
+- **Gemeinsamer Feed**: erkannte Posts landen für alle im selben Live-Feed, egal wer das Profil eingetragen hat — bewusst so, damit die ganze Community mitbekommt, was läuft.
+- **Echter Browser-Push-Alarm**: postet ein beobachtetes Profil etwas Neues, bekommst du eine echte Benachrichtigung auf jedem Gerät, auf dem du "Push aktivieren" angetippt hast — wie bei einer App, auch wenn die Seite gerade nicht offen ist. Der Alarm geht an alle, die Push aktiviert haben (passend zum gemeinsamen Feed), nicht nur an den, der das Profil eingetragen hat.
 - **Live-Feed auf der Seite**: alle erkannten Posts, neueste zuerst, mit Button "Zum Post" (öffnet den echten X-Post in einem neuen Tab). Praktisch als Verlauf, falls du eine Benachrichtigung verpasst hast.
 - **Login mit Discord, Pflicht**: ohne Anmeldung siehst du nur den Login-Bildschirm.
 
@@ -47,7 +48,8 @@ Für einen schnellen lokalen Test ohne Login/Supabase-Anbindung: Doppelklick auf
 
 ## Watchlist-Regeln & Grenzen
 
-- Ein X-Handle kann nur einmal auf der Liste stehen (Duplikate werden abgewiesen).
+- Ein X-Handle kann nicht doppelt auf **deiner eigenen** Liste stehen (Duplikate werden abgewiesen) — andere Nutzer können dasselbe Profil unabhängig auf ihrer eigenen Liste haben, ohne dass sich das gegenseitig stört.
+- Entfernst du als letzter Nutzer ein Profil von deiner Watchlist (niemand sonst trackt es mehr), wird es automatisch komplett vergessen — inklusive seiner bisherigen Posts im Feed.
 - Beim Hinzufügen eines neuen Profils wird bewusst **keine alte Historie nachgemeldet** — nur Posts, die nach dem Hinzufügen kommen, lösen einen Alarm aus. Sonst gäbe es beim Eintragen eines aktiven Accounts eine Alarm-Flut aus der Vergangenheit.
 - Gespeichert wird nur ein kurzer Text-Ausschnitt (ca. 200 Zeichen), nie der vollständige Post — der Link führt immer zum echten Original.
 

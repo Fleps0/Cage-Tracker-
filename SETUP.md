@@ -45,7 +45,7 @@ Falls für `cage-quiz` schon eine Discord-App existiert, kannst du dieselbe App 
 
 1. Im Supabase-Dashboard: **SQL Editor** → "New query".
 2. Öffne `supabase-schema.sql` aus diesem Ordner, kopiere den gesamten Inhalt, füg ihn ein.
-3. "Run" klicken. Es sollte "Success" erscheinen — damit existieren die Tabellen `watchlist`, `posts` und `push_subscriptions` inklusive Zugriffsregeln und Realtime.
+3. "Run" klicken. Es sollte "Success" erscheinen — damit existieren die Tabellen `tracked_handles`, `watchlist` (persönlich pro Nutzer), `posts` (gemeinsamer Feed) und `push_subscriptions`, inklusive Zugriffsregeln, Aufräum-Automatik und Realtime.
 
 ---
 
