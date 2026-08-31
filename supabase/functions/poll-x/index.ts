@@ -30,6 +30,7 @@ interface TrackedHandleRow {
   id: string;
   handle: string;
   last_seen_post_id: string | null;
+  avatar_url: string | null;
 }
 
 // Fragt die neuesten Posts eines Profils ab. Isolierter Baustein -- hier setzt ein
@@ -53,7 +54,7 @@ Deno.serve(async () => {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
   const [handlesRes, subsRes] = await Promise.all([
-    supabase.from("tracked_handles").select("id, handle, last_seen_post_id"),
+    supabase.from("tracked_handles").select("id, handle, last_seen_post_id, avatar_url"),
     supabase.from("push_subscriptions").select("id, endpoint, p256dh, auth_key"),
   ]);
 
@@ -97,6 +98,7 @@ Deno.serve(async () => {
           post_id: tweet.id,
           post_url: postUrl(row.handle, tweet),
           text_preview: truncate(tweet.text),
+          avatar_url: row.avatar_url,
           posted_at: tweet.createdAt ? new Date(tweet.createdAt).toISOString() : null,
         });
         if (insertError) {

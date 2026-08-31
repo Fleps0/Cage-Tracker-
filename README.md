@@ -7,7 +7,8 @@ Eine eigenständige Seite für den CAGE-Discord: die Community trägt wichtige X
 - **Persönliche Watchlist**: jeder Nutzer hat seine eigene, private Liste — niemand sonst sieht, wen du beobachtest. Im Hintergrund wird dasselbe Profil trotzdem nur einmal abgefragt, auch wenn mehrere Leute es getrackt haben (spart Kosten bei der X-Datenquelle).
 - **Gemeinsamer Feed**: erkannte Posts landen für alle im selben Live-Feed, egal wer das Profil eingetragen hat — bewusst so, damit die ganze Community mitbekommt, was läuft.
 - **Echter Browser-Push-Alarm**: postet ein beobachtetes Profil etwas Neues, bekommst du eine echte Benachrichtigung auf jedem Gerät, auf dem du "Push aktivieren" angetippt hast — wie bei einer App, auch wenn die Seite gerade nicht offen ist. Der Alarm geht an alle, die Push aktiviert haben (passend zum gemeinsamen Feed), nicht nur an den, der das Profil eingetragen hat.
-- **Live-Feed auf der Seite**: alle erkannten Posts, neueste zuerst, mit Button "Zum Post" (öffnet den echten X-Post in einem neuen Tab). Praktisch als Verlauf, falls du eine Benachrichtigung verpasst hast.
+- **Live-Feed auf der Seite**: alle erkannten Posts, neueste zuerst, mit Profilbild, Button "Zum Post" (öffnet den echten X-Post in einem neuen Tab) und einer kurzen Einblendung oben rechts, sobald was Neues reinkommt — egal welcher Tab gerade offen ist. Praktisch als Verlauf, falls du eine Benachrichtigung verpasst hast.
+- **Mitglieder-Zähler**: zeigt, wie viele CAGE-Discord-Mitglieder sich schon mit Cage Tracker verbunden haben (nur die Anzahl, keine Namen).
 - **Login mit Discord, Pflicht**: ohne Anmeldung siehst du nur den Login-Bildschirm.
 
 ## Wie Login & Speicherung funktionieren
@@ -18,7 +19,7 @@ Genau wie bei [cage-quiz](../cage-quiz/README.md): Die Seite selbst bleibt eine 
 
 Das ist der Teil, der über das Quiz hinausgeht — und der Weg dahin ist bewusst zweistufig:
 
-**Echtzeit-Weg (der Hauptweg):** Sobald ein Profil zur Watchlist hinzugefügt wird, meldet Cage Tracker es bei twitterapi.io für **Echtzeit-Beobachtung** an. Postet das Profil etwas, schickt twitterapi.io **sofort** (typischerweise innerhalb weniger Sekunden) einen Webhook-Aufruf an eine eigene Supabase Edge Function (`supabase/functions/tweet-webhook/`) — die trägt den Post in die Datenbank ein und schickt eine **echte Browser-Push-Benachrichtigung** (Web-Push-Standard, VAPID) an jeden, der sich auf der Seite dafür angemeldet hat.
+**Echtzeit-Weg (der Hauptweg):** Sobald ein Profil zur Watchlist hinzugefügt wird, meldet Cage Tracker es bei twitterapi.io für **Echtzeit-Beobachtung** an. Postet das Profil etwas, schickt twitterapi.io **sofort** (typischerweise innerhalb weniger Sekunden) einen Webhook-Aufruf. Der geht zuerst an eine kleine, kostenlose **Cloudflare**-Weiterleitung (nötig, weil twitterapi.io Supabase-Adressen direkt nicht akzeptiert, siehe `SETUP.md`) und von dort an eine Supabase Edge Function (`supabase/functions/tweet-webhook/`) — die trägt den Post in die Datenbank ein und schickt eine **echte Browser-Push-Benachrichtigung** (Web-Push-Standard, VAPID) an jeden, der sich auf der Seite dafür angemeldet hat.
 
 **Sicherheitsnetz (der Ersatzweg):** Eine zweite Supabase Edge Function (`supabase/functions/poll-x/`) läuft zusätzlich alle 30 Minuten über einen Cron-Job und fragt sicherheitshalber nochmal alle Profile ab — falls der Webhook mal ausfällt (Störung bei twitterapi.io, falsch konfigurierte Adresse, o. Ä.), geht so trotzdem nichts dauerhaft verloren, nur eben mit Verzögerung.
 

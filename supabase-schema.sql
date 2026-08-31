@@ -22,6 +22,9 @@ create table if not exists public.tracked_handles (
   -- ID, die twitterapi.io für die Echtzeit-Beobachtung dieses Profils vergibt (aus
   -- get_user_to_monitor_tweet) -- nötig, um das Profil später sauber wieder abzumelden.
   stream_monitor_id text,
+  -- Profilbild-URL von X, einmalig abgefragt (siehe watchlist-Edge-Function) und dann
+  -- wiederverwendet -- spart wiederholte, kostenpflichtige Abfragen.
+  avatar_url text,
   created_at timestamptz not null default now()
 );
 
@@ -33,6 +36,9 @@ create table if not exists public.watchlist (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   handle text not null,
+  -- Kopie von tracked_handles.avatar_url, damit die eigene Watchlist-Ansicht das
+  -- Profilbild zeigen kann, ohne dass normale Nutzer tracked_handles lesen dürfen.
+  avatar_url text,
   created_at timestamptz not null default now(),
   unique (user_id, handle)
 );
@@ -113,6 +119,9 @@ create table if not exists public.posts (
   post_id text not null,
   post_url text not null,
   text_preview text,
+  -- Kopie von tracked_handles.avatar_url zum Zeitpunkt des Fundes, damit der Feed das
+  -- Profilbild zeigen kann, ohne tracked_handles lesen zu müssen.
+  avatar_url text,
   posted_at timestamptz,
   detected_at timestamptz not null default now(),
   unique (handle, post_id)
@@ -154,3 +163,17 @@ drop policy if exists "push_subscriptions_delete_own" on public.push_subscriptio
 create policy "push_subscriptions_delete_own"
   on public.push_subscriptions for delete
   using (auth.uid() = user_id);
+
+-- Mitglieder-Zähler für die Seite ("X Mitglieder"): normale Nutzer dürfen auth.users nicht
+-- direkt lesen, deshalb diese schlanke SECURITY-DEFINER-Funktion, die nur die Anzahl
+-- zurückgibt -- keine Namen, keine E-Mails, keine sonstigen Nutzer-Daten.
+create or replace function public.get_member_count()
+returns bigint
+language sql
+security definer
+set search_path = public
+as $$
+  select count(*) from auth.users;
+$$;
+
+grant execute on function public.get_member_count() to authenticated;

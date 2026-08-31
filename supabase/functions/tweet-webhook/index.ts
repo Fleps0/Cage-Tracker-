@@ -28,6 +28,7 @@ interface TrackedHandleRow {
   id: string;
   handle: string;
   last_seen_post_id: string | null;
+  avatar_url: string | null;
 }
 
 interface IncomingTweet {
@@ -92,7 +93,7 @@ Deno.serve(async (req: Request) => {
     try {
       const { data: trackedRow, error: trackedError } = await supabase
         .from("tracked_handles")
-        .select("id, handle, last_seen_post_id")
+        .select("id, handle, last_seen_post_id, avatar_url")
         .eq("handle", handle)
         .maybeSingle();
 
@@ -113,6 +114,7 @@ Deno.serve(async (req: Request) => {
         post_id: tweet.id,
         post_url: postUrl(row.handle, tweet),
         text_preview: truncate(tweet.text),
+        avatar_url: row.avatar_url,
         posted_at: tweet.createdAt ? new Date(tweet.createdAt).toISOString() : null,
       });
 

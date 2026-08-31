@@ -2,7 +2,7 @@
 
 Diese Anleitung führt einmalig durch die komplette Einrichtung: Login, Speicherung und den automatischen Echtzeit-Alarm. Danach läuft alles dauerhaft, ohne dass du etwas am Laufen halten musst. Rechne mit ca. **75–90 Minuten** für den ersten Durchlauf (mehr als beim Quiz, wegen dreier Edge Functions, dem Streaming-Abo und dem Cron-Job als Sicherheitsnetz).
 
-Kurz zum Prinzip: **Supabase** speichert Accounts, Watchlist, Feed und Push-Abos (kostenlos) und betreibt zwei kleine Funktionen im Hintergrund. **Discord** ist nur der Login-Anbieter. Der Alarm selbst läuft in zwei Stufen: **Echtzeit per Webhook** (Hauptweg, sofort) und ein **Sicherheitsnetz alle 30 Minuten** (falls der Webhook mal ausfällt) — beides kommt am Ende als echte **Browser-Push-Benachrichtigung direkt von der Seite** an, kein Discord-Bot nötig. **GitHub Pages** hostet die eigentliche Seite (kostenlos). **twitterapi.io** liefert die X-Post-Daten — **wichtig: das ist ab hier nicht mehr nur ein paar Cent, sondern ein Abo ab 29 $/Monat** (siehe Schritt 7, und README.md für die volle Kostenrechnung). Nichts davon muss auf deinem PC laufen.
+Kurz zum Prinzip: **Supabase** speichert Accounts, Watchlist, Feed und Push-Abos (kostenlos) und betreibt drei kleine Funktionen im Hintergrund. **Discord** ist nur der Login-Anbieter. Der Alarm selbst läuft in zwei Stufen: **Echtzeit per Webhook** (Hauptweg, sofort — über einen kleinen kostenlosen **Cloudflare**-Zwischenschritt, siehe Schritt 11) und ein **Sicherheitsnetz alle 30 Minuten** (falls der Webhook mal ausfällt) — beides kommt am Ende als echte **Browser-Push-Benachrichtigung direkt von der Seite** an, kein Discord-Bot nötig. **GitHub Pages** hostet die eigentliche Seite (kostenlos). **twitterapi.io** liefert die X-Post-Daten — **wichtig: das ist ab hier nicht mehr nur ein paar Cent, sondern ein Abo ab 29 $/Monat** (siehe Schritt 7, und README.md für die volle Kostenrechnung). Nichts davon muss auf deinem PC laufen.
 
 ---
 
@@ -45,7 +45,7 @@ Falls für `cage-quiz` schon eine Discord-App existiert, kannst du dieselbe App 
 
 1. Im Supabase-Dashboard: **SQL Editor** → "New query".
 2. Öffne `supabase-schema.sql` aus diesem Ordner, kopiere den gesamten Inhalt, füg ihn ein.
-3. "Run" klicken. Es sollte "Success" erscheinen — damit existieren die Tabellen `tracked_handles`, `watchlist` (persönlich pro Nutzer), `posts` (gemeinsamer Feed) und `push_subscriptions`, inklusive Zugriffsregeln, Aufräum-Automatik und Realtime.
+3. "Run" klicken. Es sollte "Success" erscheinen — damit existieren die Tabellen `tracked_handles`, `watchlist` (persönlich pro Nutzer), `posts` (gemeinsamer Feed) und `push_subscriptions`, inklusive Profilbild-Spalten, Zugriffsregeln, Aufräum-Automatik, dem Mitglieder-Zähler und Realtime.
 
 *(Schon ein älteres Cage-Tracker-Projekt am Laufen? Dann brauchst du stattdessen die Migration, die dir separat mitgegeben wurde, statt dieser Datei — sonst gehen bestehende Watchlist-Einträge verloren.)*
 
@@ -113,11 +113,11 @@ Die ausgegebene lange Zeichenkette **kopieren und irgendwo kurz zwischenspeicher
    ```bash
    supabase link --project-ref DEINE-PROJEKT-REFERENZ
    ```
-4. **Alle drei** Edge Functions deployen:
+4. **Alle drei** Edge Functions deployen — `tweet-webhook` mit `--no-verify-jwt`, weil sie von twitterapi.io aufgerufen wird, das keinen Supabase-Login-Nachweis mitschickt (abgesichert wird sie stattdessen über den `WEBHOOK_TOKEN` im Code selbst, siehe Schritt 9):
    ```bash
    supabase functions deploy poll-x --project-ref DEINE-PROJEKT-REFERENZ
    supabase functions deploy watchlist --project-ref DEINE-PROJEKT-REFERENZ
-   supabase functions deploy tweet-webhook --project-ref DEINE-PROJEKT-REFERENZ
+   supabase functions deploy tweet-webhook --no-verify-jwt --project-ref DEINE-PROJEKT-REFERENZ
    ```
 5. Secrets setzen — **über das Supabase-Dashboard, nicht über die Kommandozeile** (die Werte sind zu lang/zu speziell fürs normale cmd-Fenster, im Dashboard ist es ein simples Formular):
    1. Im Supabase-Dashboard: **Edge Functions → Secrets** (oder **Project Settings → Edge Functions**, je nach Dashboard-Version).
@@ -134,18 +134,42 @@ Die ausgegebene lange Zeichenkette **kopieren und irgendwo kurz zwischenspeicher
 
 ## 11. Webhook-Adresse bei twitterapi.io hinterlegen
 
-Jetzt, wo `tweet-webhook` deployed ist, kennen wir ihre echte Adresse:
+**Wichtig, vom twitterapi.io-Support bestätigt (2026-08-31): `*.supabase.co`-Adressen werden als Webhook-Ziel abgelehnt** ("webhook_url is not valid"). Deshalb braucht es einen kleinen kostenlosen Zwischen-Schritt über **Cloudflare Workers** — der bekommt eine andere, akzeptierte Adresse (`*.workers.dev`) und leitet alles unverändert an die echte Supabase-Funktion weiter. Fertiger Code liegt schon in `cage-tracker/cloudflare-webhook-proxy/`.
+
+### 11a. Cloudflare-Weiterleitung einrichten
+
+1. Kostenlosen Account anlegen: https://dash.cloudflare.com/sign-up
+2. Wrangler (Cloudflare's Kommandozeilen-Werkzeug, wie die Supabase CLI) installieren:
+   ```bash
+   npm install -g wrangler
+   ```
+3. Einloggen (öffnet den Browser):
+   ```bash
+   wrangler login
+   ```
+4. In den Ordner `cage-tracker/cloudflare-webhook-proxy/` wechseln:
+   ```bash
+   cd cloudflare-webhook-proxy
+   ```
+5. `wrangler.toml` in diesem Ordner öffnen (Editor) und `DEINE-PROJEKT-REFERENZ` in der `TARGET_URL`-Zeile durch deine echte Supabase-Projekt-Referenz ersetzen, speichern.
+6. Deployen:
+   ```bash
+   wrangler deploy
+   ```
+7. Die Konsole zeigt am Ende eine Adresse wie `https://cage-tracker-webhook-proxy.DEIN-CLOUDFLARE-NAME.workers.dev` — **kopieren**.
+
+### 11b. Diese Adresse bei twitterapi.io eintragen
+
+Komplette Webhook-Adresse (Worker-Adresse aus 11a + `/tweet-webhook?token=` + Webhook-Token aus Schritt 9):
 
 ```
-https://DEINE-PROJEKT-REFERENZ.functions.supabase.co/tweet-webhook?token=DEIN-WEBHOOK-TOKEN
+https://cage-tracker-webhook-proxy.DEIN-CLOUDFLARE-NAME.workers.dev/tweet-webhook?token=DEIN-WEBHOOK-TOKEN
 ```
 
-(Projekt-Referenz aus Schritt 2, Webhook-Token aus Schritt 9 — beide in die Adresse einsetzen.)
+1. Im twitterapi.io-Dashboard: **https://twitterapi.io/twitter-stream/manage** → **"Webhook Configuration"** → Feld **"Endpoint URL"**.
+2. Die oben zusammengesetzte Worker-Adresse dort eintragen, speichern — sollte jetzt ohne "not valid"-Fehler klappen.
 
-1. Im twitterapi.io-Dashboard, im selben Streaming-Bereich wie in Schritt 7: nach einem Feld für **"Webhook URL"** oder **"Callback URL"** suchen.
-2. Die oben zusammengesetzte Adresse dort eintragen, speichern.
-
-**Falls dieses Feld nicht offensichtlich zu finden ist:** in der aktuellen API-Doku von twitterapi.io nachsehen (https://docs.twitterapi.io) oder den Support fragen — dieser Schritt hängt vom genauen Dashboard-Stand zum Zeitpunkt deiner Einrichtung ab, der sich seit dem Schreiben dieser Anleitung geändert haben könnte.
+**Falls "Webhook Configuration" nicht zu finden ist:** Menüpunkt kann sich mit Dashboard-Updates verschieben — notfalls Support fragen oder in der aktuellen Doku (https://docs.twitterapi.io) nachsehen.
 
 ---
 
@@ -232,7 +256,8 @@ select cron.unschedule('cage-tracker-poll-x');
 
 - **Push-Knopf bleibt grau/verschwindet:** Browser unterstützt evtl. kein Web Push, oder `VAPID_PUBLIC_KEY` in `config.js` fehlt noch/hat noch den Platzhalter-Wert.
 - **Hinzufügen zur Watchlist schlägt fehl oder hängt:** Im Supabase-Dashboard unter **Edge Functions → watchlist → Logs** nachsehen. Häufigste Ursache: `X_API_KEY` fehlt/falsch, oder das Streaming-Abo (Schritt 7) ist noch nicht aktiv.
-- **Keine Benachrichtigung innerhalb von Sekunden (aber nach bis zu 30 Minuten schon):** Der Echtzeit-Weg greift nicht, das Sicherheitsnetz schon. Meistens liegt es an der Webhook-Adresse aus Schritt 11 (falsch eingetragen oder `WEBHOOK_TOKEN` stimmt nicht überein) — in **Edge Functions → tweet-webhook → Logs** nachsehen, ob überhaupt Aufrufe ankommen. Kommt gar nichts an: Adresse in Schritt 11 nochmal genau prüfen. Kommen Aufrufe an, aber mit Fehlern: den geloggten Payload (`tweet-webhook Payload: ...`) anschauen — das Nachrichtenformat könnte von den Annahmen im Code abweichen und muss in `extractTweets()` in `tweet-webhook/index.ts` angepasst werden.
+- **"webhook_url is not valid" beim Speichern bei twitterapi.io:** Das ist die bekannte Sperre gegen `*.supabase.co`-Adressen (siehe Schritt 11) — die Cloudflare-Weiterleitung aus Schritt 11a/11b umgehen das. Testen kannst du das Feld selbst mit einer https://webhook.site-Adresse (kein Login nötig) — speichert die, liegt es wirklich an der Domain, nicht an der Formatierung deiner Adresse.
+- **Keine Benachrichtigung innerhalb von Sekunden (aber nach bis zu 30 Minuten schon):** Der Echtzeit-Weg greift nicht, das Sicherheitsnetz schon. Prüfen, in dieser Reihenfolge: (1) Läuft der Cloudflare-Worker? `wrangler deploy` nochmal ausführen, sollte ohne Fehler durchlaufen. (2) In **Edge Functions → tweet-webhook → Logs** nachsehen, ob überhaupt Aufrufe ankommen. Kommt gar nichts an: Adresse in Schritt 11b nochmal genau prüfen (Worker-Adresse + Pfad + Token). Kommen Aufrufe an, aber mit Fehlern: den geloggten Payload (`tweet-webhook Payload: ...`) anschauen — das Nachrichtenformat könnte von den Annahmen im Code abweichen und muss in `extractTweets()` in `tweet-webhook/index.ts` angepasst werden.
 - **Gar keine Benachrichtigung, auch nicht nach 30 Minuten:** Im Supabase-Dashboard unter **Edge Functions → poll-x → Logs** nachsehen, ob die Funktion überhaupt läuft und ob Fehler auftauchen (häufigste Ursache: falscher/fehlender `X_API_KEY` oder `VAPID_KEYS_JSON` in den Secrets — Schritt 10 nochmal prüfen).
 - **Cron scheint nicht zu laufen:** `select * from cron.job;` im SQL Editor prüfen, ob der Job existiert und aktiv ist. `select * from cron.job_run_details order by start_time desc limit 5;` zeigt die letzten Ausführungen und eventuelle Fehler.
 - **Login schlägt fehl:** am wahrscheinlichsten Schritt 15 (Redirect URLs) noch offen, oder `config.js` hat noch Platzhalter-Werte oder fehlende Anführungszeichen.

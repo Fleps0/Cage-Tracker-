@@ -1,0 +1,12 @@
+# Cage Tracker: Konfiguration für den Cloudflare-Worker, der twitterapi.io's Sperre
+# gegen *.supabase.co als Webhook-Ziel umgeht (siehe worker.js und SETUP.md).
+#
+# TARGET_URL auf deine eigene Supabase-Projekt-Referenz anpassen, bevor du deployst
+# (siehe SETUP.md -- derselbe Wert wie sonst überall "DEINE-PROJEKT-REFERENZ").
+
+name = "cage-tracker-webhook-proxy"
+main = "worker.js"
+compatibility_date = "2026-08-31"
+
+[vars]
+TARGET_URL = "https://vvporagapfxytnvqtqex.functions.supabase.co/tweet-webhook"

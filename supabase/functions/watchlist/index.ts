@@ -55,6 +55,20 @@ async function registerStream(handle: string): Promise<string | null> {
   return match?.id_for_user ?? null;
 }
 
+// Holt die Profilbild-URL von X. Wird nur einmal pro Handle gebraucht (danach in
+// tracked_handles zwischengespeichert), deshalb kein Aufwand, das isoliert zu halten.
+async function fetchAvatarUrl(handle: string): Promise<string | null> {
+  const res = await fetch(`https://api.twitterapi.io/twitter/user/info?userName=${encodeURIComponent(handle)}`, {
+    headers: { "X-API-Key": X_API_KEY },
+  });
+  if (!res.ok) {
+    console.error(`twitterapi.io user/info fehlgeschlagen für @${handle}:`, await res.text());
+    return null;
+  }
+  const data = await res.json();
+  return data?.data?.profilePicture ?? null;
+}
+
 async function unregisterStream(streamMonitorId: string): Promise<void> {
   const res = await fetch("https://api.twitterapi.io/oapi/x_user_stream/remove_user_to_monitor_tweet", {
     method: "POST",
@@ -110,6 +124,29 @@ Deno.serve(async (req: Request) => {
       // Wird beim nächsten Hinzufügen desselben Handles (durch einen anderen Nutzer) erneut
       // versucht, weil wasNew dann zwar false ist, stream_monitor_id aber weiterhin fehlt --
       // das ist ein bekanntes, kleines Restrisiko, kein stiller Datenverlust.
+    }
+
+    // Profilbild besorgen -- nur einmal pro Handle von twitterapi.io abfragen, danach
+    // aus tracked_handles wiederverwenden (spart Abfragen, wenn mehrere Nutzer dasselbe
+    // Profil eintragen).
+    const { data: trackedRow } = await serviceClient
+      .from("tracked_handles")
+      .select("avatar_url")
+      .eq("handle", handle)
+      .maybeSingle();
+    let avatarUrl = trackedRow?.avatar_url ?? null;
+    if (!avatarUrl) {
+      avatarUrl = await fetchAvatarUrl(handle);
+      if (avatarUrl) {
+        await serviceClient.from("tracked_handles").update({ avatar_url: avatarUrl }).eq("handle", handle);
+      }
+    }
+    if (avatarUrl) {
+      await serviceClient
+        .from("watchlist")
+        .update({ avatar_url: avatarUrl })
+        .eq("user_id", userData.user.id)
+        .eq("handle", handle);
     }
 
     return json({ ok: true });
